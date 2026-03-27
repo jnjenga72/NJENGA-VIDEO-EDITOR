@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jenga Video Editor</title>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;700&family=Roboto+Mono&display=swap" rel="stylesheet">
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
+        .timeline-track { background: repeating-linear-gradient(90deg, #18181b, #18181b 49px, #27272a 50px); }
+        .preview-portrait { aspect-ratio: 9/16; height: 60vh; width: auto !important; }
+        .preview-landscape { aspect-ratio: 16/9; width: 80%; height: auto !important; }
+        #canvasOverlay { pointer-events: none; }
+        #canvasOverlay div { pointer-events: auto; }
+    </style>
+</head>
+<body class="bg-[#09090b] text-zinc-300 h-screen flex flex-col overflow-hidden font-sans">
+    <svg style="display:none">
+        <filter id="cartoon-filter">
+            <feEdgeDetect input="SourceGraphic" result="edge"/>
+            <feColorMatrix type="matrix" values="-1 0 0 0 1  0 -1 0 0 1  0 0 -1 0 1  0 0 0 1 0" in="edge" result="invEdge"/>
+        </filter>
+    </svg>
+    <!-- Header -->
+    <nav class="h-14 border-b border-zinc-800 flex items-center justify-between px-6 bg-[#121214]">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-cubes text-yellow-500 text-xl"></i>
+            <span class="font-bold text-white tracking-tight uppercase">Jenga <span class="text-yellow-500">Video Editor</span></span>
+        </div>
+        <button id="exportBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded font-semibold text-sm transition flex items-center gap-2">
+            <i class="fa-solid fa-download"></i> Export Video
+        </button>
+    </nav>
+
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Sidebar -->
+        <aside class="w-72 border-r border-zinc-800 p-5 flex flex-col gap-8 bg-[#121214]">
+            <section>
+                <label class="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-4 block">Import Media</label>
+                <input type="file" id="videoInput" accept="video/*" class="hidden">
+                <button id="videoDropZone" onclick="document.getElementById('videoInput').click()" class="w-full h-24 border-2 border-dashed border-zinc-700 rounded-xl hover:bg-zinc-800/50 hover:border-blue-500 transition flex flex-col items-center justify-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up text-zinc-500 text-xl"></i>
+                    <span class="text-xs text-zinc-400">Upload Video</span>
+                </button>
+            </section>
+
+            <section>
+                <label class="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">Text Overlay</label>
+                <input type="text" id="overlayText" placeholder="Subtitle text..." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none transition mb-2">
+                <button id="addKeyframe" class="w-full text-[10px] bg-zinc-800 hover:bg-zinc-700 py-1 rounded border border-zinc-600">
+                    <i class="fa-solid fa-stopwatch"></i> Add Keyframe (Opacity)
+                </button>
+                <button id="addTextOverlayAtPlayhead" class="w-full text-[10px] bg-blue-800/50 hover:bg-blue-700/50 py-1 rounded border border-blue-600 mt-2">
+                    <i class="fa-solid fa-plus"></i> Add Text at Playhead
+                </button>
+            </section>
+
+            <section>
+                <label class="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">Video Speed</label>
+                <div class="flex items-center gap-2">
+                    <input type="range" id="videoSpeed" min="0.25" max="4" step="0.25" value="1" class="w-full h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer">
+                    <span id="videoSpeedDisplay" class="text-xs text-zinc-400 w-10 text-right">100%</span>
+                </div>
+                
+            </section>
+
+            <section>
+                <label class="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">Color Grading</label>
+                <select id="colorGrade" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none">
+                    <option value="none">None (Natural)</option>
+                    <option value="film">Cinematic Film</option>
+                    <option value="noir">Noir (B&W)</option>
+                    <option value="warm">Golden Hour</option>
+                    <option value="cold">Nordic Cold</option>
+                </select>
+            </section>
+
+            <section>
+                <label class="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">Export Quality</label>
+                <select id="videoQuality" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none">
+                    <option value="1080">1080p (FHD)</option>
+                    <option value="720">720p (HD)</option>
+                    <option value="480">480p (SD)</option>
+                </select>
+            </section>
+
+            <section>
+                <label class="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">Video Transitions</label>
+                <select id="videoTransition" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm outline-none">
+                    <option value="none">None</option>
+                    <option value="fade">Fade</option>
+                    <option value="wipe">Wipe</option>
+                </select>
+            </section>
+
+            <section>
+                <label class="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">Audio Effects</label>
+                <button class="w-full text-[10px] bg-zinc-800 hover:bg-zinc-700 py-1 rounded border border-zinc-600">Add Reverb</button>
+            </section>
+
+            <section>
+                <label class="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-3 block">Background Music</label>
+                <input type="file" id="audioInput" accept="audio/*" class="w-full text-xs text-zinc-500 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-zinc-800 file:text-zinc-300 hover:file:bg-zinc-700 cursor-pointer p-2 border-2 border-dashed border-transparent hover:border-emerald-500 rounded-lg transition">
+            </section>
+        </aside>
+
+        <!-- Image to Cartoon Section (Placeholder) -->
+        <aside class="w-64 border-l border-zinc-800 p-5 flex flex-col gap-8 bg-[#121214]">
+            <section>
+                <label class="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-4 block">Image to Cartoon</label>
+                <input type="file" id="imageToCartoonInput" accept="image/*" class="hidden">
+                <button onclick="document.getElementById('imageToCartoonInput').click()" class="w-full h-24 border-2 border-dashed border-zinc-700 rounded-xl hover:bg-zinc-800/50 transition flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-image text-zinc-500 text-xl"></i><span class="text-xs text-zinc-400">Upload Image</span></button>
+            </section>
+        </aside>
+
+        <!-- Canvas Area -->
+        <main class="flex-1 bg-black flex items-center justify-center p-10 relative">
+            <div id="previewContainer" class="hidden relative max-w-full max-h-full shadow-2xl">
+                <video id="mainVideo" class="max-h-[60vh] rounded-lg"></video>
+                <div id="canvasOverlay" class="absolute inset-0 flex items-end justify-center pb-10 pointer-events-none">
+                </div>
+            </div>
+            <div id="emptyState" class="flex flex-col items-center gap-4 text-zinc-600">
+                <i class="fa-solid fa-film text-6xl"></i>
+                <p class="text-sm italic">Ready to start? Import a video clip.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Timeline -->
+    <footer class="h-72 bg-[#121214] border-t border-zinc-800 p-6">
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex gap-4">
+                <button id="playBtn" class="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-zinc-700 transition">
+                    <i class="fa-solid fa-play"></i>
+                </button>
+                <button id="razorBtn" class="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-red-900/40 text-red-500 border border-transparent hover:border-red-500/50 transition" title="Razor Tool (Split)">
+                    <i class="fa-solid fa-scissors"></i>
+                </button>
+                <button id="deleteBtn" class="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-red-900/40 text-red-500 border border-transparent hover:border-red-500/50 transition" title="Delete Selected">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+                <button id="duplicateBtn" class="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-800 hover:bg-blue-900/40 text-blue-500 border border-transparent hover:border-blue-500/50 transition" title="Duplicate Selected">
+                    <i class="fa-solid fa-copy"></i>
+                </button>
+                <div class="flex flex-col justify-center">
+                    <span id="timestamp" class="text-xs font-mono text-blue-500">00:00:00</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 bg-zinc-900 px-3 py-1.5 rounded-md border border-zinc-800">
+                <span class="text-[10px] uppercase font-bold text-zinc-500">Zoom:</span>
+                <button id="zoomOutBtn" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-minus"></i></button>
+                <span id="zoomLevelDisplay" class="text-xs text-zinc-400">1x</span>
+                <button id="zoomInBtn" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
+
+        <div class="space-y-3">
+            <!-- Timeline Ruler (Placeholder) -->
+            <div id="timelineRuler" class="h-6 bg-zinc-900 border-b border-zinc-800 relative overflow-hidden">
+                <div class="absolute inset-0 flex items-center text-[8px] text-zinc-600" id="rulerMarks">
+                    <!-- Ruler marks will be generated by JS -->
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <div class="w-16 text-[10px] font-bold text-zinc-600 uppercase">Video</div>
+                <div class="flex-1 h-12 rounded-lg border border-blue-500/30 bg-blue-500/10 timeline-track relative overflow-hidden">
+                    <div id="videoTimelineTrack" class="absolute inset-0">
+                        <div id="playhead" class="absolute top-0 bottom-0 w-1 bg-red-500 cursor-grab z-20"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="w-16 text-[10px] font-bold text-zinc-600 uppercase">Audio</div>
+                <div id="audioTrack" class="flex-1 h-12 rounded-lg border border-zinc-800 bg-zinc-900/50 timeline-track relative"></div>
+                <div id="audioWaveform" class="absolute inset-0 z-0 opacity-50"></div>
+            </div>
+            <div id="textOverlayTrack" class="flex items-center gap-4"></div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
